@@ -187,23 +187,24 @@ void UKF::Prediction(double delta_t)
     //create augmented sigma points
     MatrixXd Xsig_aug_  = MatrixXd(n_aug_, 2 * n_aug_ + 1);
     Xsig_aug_.col(0)    = x_aug_;
+    double sqrt_lambda_n_aug = sqrt(lambda_ + n_aug_);
     for (int i = 0; i< n_aug_; i++)
     {
-        Xsig_aug_.col(i+1)          = x_aug_ + sqrt(lambda_ + n_aug_) * L.col(i);
-        Xsig_aug_.col(i+1+n_aug_)   = x_aug_ - sqrt(lambda_ + n_aug_) * L.col(i);
+        Xsig_aug_.col(i+1)          = x_aug_ + sqrt_lambda_n_aug * L.col(i);
+        Xsig_aug_.col(i+1+n_aug_)   = x_aug_ - sqrt_lambda_n_aug * L.col(i);
     }
     
     //predict sigma points
     for (int i = 0; i< 2 * n_aug_ + 1; i++)
     {
         //extract values for better readability
-        double px           = Xsig_aug_(0,i);
-        double py           = Xsig_aug_(1,i);
-        double v            = Xsig_aug_(2,i);
-        double yaw          = Xsig_aug_(3,i);
-        double yawd         = Xsig_aug_(4,i);
-        double nu_a         = Xsig_aug_(5,i);
-        double nu_yawdd     = Xsig_aug_(6,i);
+        const double px           = Xsig_aug_(0,i);
+        const double py           = Xsig_aug_(1,i);
+        const double v            = Xsig_aug_(2,i);
+        const double yaw          = Xsig_aug_(3,i);
+        const double yawd         = Xsig_aug_(4,i);
+        const double nu_a         = Xsig_aug_(5,i);
+        const double nu_yawdd     = Xsig_aug_(6,i);
         
         //predicted state values
         double px_pred, py_pred;
@@ -379,11 +380,25 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
     double p_pred_meas  = sqrt(px_pred * px_pred + py_pred * py_pred);
     
     if (p_pred_meas < 0.00001) p_pred_meas = 0.00001 ; // Ensure no divide by 0 error
-
+    
     // measurement model
-    Zsig(0,i) = p_pred_meas ;                                                                           //r
-    Zsig(1,i) = atan2(py_pred, px_pred);                                                                //phi
-    Zsig(2,i) = (px_pred * cos(yaw_pred) * v_pred + py_pred * sin(yaw_pred) * v_pred) / p_pred_meas ;   //r_dot
+      
+      Zsig(0,i) = p_pred_meas ;                                                                             //r
+
+    // Check for divide by 0 for phi..
+      
+    if (px_pred != 0)
+    {
+        Zsig(1,i) = atan2(py_pred, px_pred);                                                                //phi
+        Zsig(2,i) = (px_pred * cos(yaw_pred) * v_pred + py_pred * sin(yaw_pred) * v_pred) / p_pred_meas ;   //r_dot
+    }
+      
+    else
+    {
+        Zsig(1,i) = 0;
+        Zsig(2,i) = 0;
+    }
+      
   }
     
   //mean predicted measurement
@@ -454,4 +469,3 @@ void UKF::UpdateRadar(MeasurementPackage meas_package)
   NIS_radar_  = z_diff.transpose() * S.inverse() * z_diff;
     
  }
-
